@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Flame, Droplets, Heart, Zap, ShieldCheck, X, Phone } from 'lucide-react';
+import { Flame, Droplets, Heart, Zap, ShieldCheck, X, Phone, MapPin } from 'lucide-react';
 import { useBusinesses } from '../../lib/hooks';
 import { formatPhoneNumber, getRawPhone } from '../../utils';
 
@@ -58,9 +58,23 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
     if (cat === 'safety') return b.isVital || name.includes('safety') || name.includes('emergency') || b.vitalsCategory === 'Safety';
     return false;
   }).sort((a, b) => {
-    // Prioritize explicit vitalsCategory matches to pin them to top
-    const aMatch = a.vitalsCategory?.toLowerCase() === category?.toLowerCase();
-    const bMatch = b.vitalsCategory?.toLowerCase() === category?.toLowerCase();
+    const cat = category?.toLowerCase();
+    
+    // Custom priority for Medical category
+    if (cat === 'medical') {
+      const getPriority = (name: string) => {
+        const lower = name.toLowerCase();
+        if (lower.includes('divide wellness') || lower.includes('cool village pharmacy')) return 1;
+        if (lower.includes('reach') || lower.includes('calstar')) return 2;
+        if (lower.includes('hospital') || lower.includes('medical center')) return 3;
+        return 4;
+      };
+      return getPriority(a.name) - getPriority(b.name);
+    }
+
+    // Default: Prioritize explicit vitalsCategory matches to pin them to top
+    const aMatch = a.vitalsCategory?.toLowerCase() === cat;
+    const bMatch = b.vitalsCategory?.toLowerCase() === cat;
     if (aMatch && !bMatch) return -1;
     if (!aMatch && bMatch) return 1;
     return 0;
@@ -114,16 +128,42 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
                   filtered.map(b => (
                     <div key={b.id} className="p-6 bg-white rounded-[32px] border border-[#2F3E5B]/5 flex items-center justify-between group hover:shadow-xl hover:border-[#C9A24A]/30 transition-all">
                       <div className="flex-1">
-                        <h3 className="font-bold text-[#2F3E5B] text-lg leading-tight">{b.name}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-[#2F3E5B] text-lg leading-tight">{b.name}</h3>
+                          {b.vitalsCategory === 'Medical' && (b.name.toLowerCase().includes('hospital') || b.name.toLowerCase().includes('medical center')) && (
+                            <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-[8px] font-black uppercase tracking-widest border border-red-100">
+                              Emergency Room
+                            </span>
+                          )}
+                        </div>
+                        
+                        {(b.name.toLowerCase().includes('hospital') || b.name.toLowerCase().includes('medical center')) && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2">
+                            Nearest Emergency Room - Placer/EDC
+                          </p>
+                        )}
+                        
+                        {(b.name.toLowerCase().includes('reach') || b.name.toLowerCase().includes('calstar')) && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2">
+                            Critical Care Air Transport - El Dorado County Hub
+                          </p>
+                        )}
+
                         <div className="flex flex-col gap-1 mt-2">
                           <p className="text-xs font-black text-[#C9A24A] flex items-center gap-2">
                             <Phone size={10} strokeWidth={3} />
                             {formatPhoneNumber(b.contact?.phone || '')}
                           </p>
                           {b.contact?.businessAddress && (
-                            <p className="text-[10px] font-bold text-[#2F3E5B]/40 uppercase tracking-wide truncate max-w-[220px]">
+                            <a 
+                              href={`https://maps.apple.com/?q=${encodeURIComponent(b.contact.businessAddress)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-bold text-[#2F3E5B]/40 uppercase tracking-wide truncate max-w-[220px] hover:text-[#C9A24A] transition-colors flex items-center gap-1"
+                            >
+                              <MapPin size={8} />
                               {b.contact.businessAddress}
-                            </p>
+                            </a>
                           )}
                         </div>
                       </div>

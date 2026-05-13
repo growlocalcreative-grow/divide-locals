@@ -782,6 +782,108 @@ export const AdminPortal = () => {
                                         },
                                         privateHomeZip: "95633",
                                         serviceAreas: ["Garden Valley", "The Divide"]
+                                      },
+                                      {
+                                        name: "Georgetown Divide Public Utility District (GDPUD)",
+                                        category: "Water Utility",
+                                        description: "Primary water provider for the Georgetown Divide.",
+                                        isVital: true,
+                                        vitalsCategory: "Water",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "6425 Main Street, Georgetown, California 95634",
+                                          phone: "(530) 333-4356",
+                                          email: "info@gd-pud.org",
+                                          website: "https://www.gd-pud.org"
+                                        },
+                                        privateHomeZip: "95634",
+                                        serviceAreas: ["Georgetown", "Greenwood", "Garden Valley", "Cool"],
+                                        metaKeywords: ["Georgetown Water", "Divide PUD", "Water Outage Georgetown", "GDPUD"]
+                                      },
+                                      {
+                                        name: "Divide Wellness Center (Marshall)",
+                                        category: "Medical",
+                                        description: "Marshall Medical Center's local clinic serving the Georgetown Divide.",
+                                        isVital: true,
+                                        vitalsCategory: "Medical",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "6065 Highway 193, Georgetown, CA 95634",
+                                          phone: "(530) 333-2548",
+                                          email: "",
+                                          website: "https://www.marshallmedical.org"
+                                        },
+                                        privateHomeZip: "95634",
+                                        serviceAreas: ["Georgetown", "Greenwood", "Garden Valley"],
+                                        metaKeywords: ["Georgetown Doctor", "Medical Clinic", "Marshall Medical"]
+                                      },
+                                      {
+                                        name: "Cool Village Pharmacy",
+                                        category: "Medical",
+                                        description: "Local pharmacy serving the Cool area and the Divide.",
+                                        isVital: true,
+                                        vitalsCategory: "Medical",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "5020 Ellinghouse Drive E, Cool, CA 95614",
+                                          phone: "(530) 889-1427",
+                                          email: "info@coolvillagepharmacy.com",
+                                          website: "https://coolvillagepharmacy.com"
+                                        },
+                                        privateHomeZip: "95614",
+                                        serviceAreas: ["Cool", "Greenwood", "Georgetown"],
+                                        metaKeywords: ["Cool Pharmacy", "Prescriptions Cool", "Medical Supplies"]
+                                      },
+                                      {
+                                        name: "REACH / CALSTAR Air Medical",
+                                        category: "Medical",
+                                        description: "Critical Care Air Transport - El Dorado County Hub.",
+                                        isVital: true,
+                                        vitalsCategory: "Medical",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "1901 Lisa Maloff Way, South Lake Tahoe, CA 96150",
+                                          phone: "(800) 793-0010",
+                                          email: "",
+                                          website: "https://reachair.com"
+                                        },
+                                        privateHomeZip: "96150",
+                                        serviceAreas: ["The Divide", "El Dorado County"],
+                                        metaKeywords: ["Air Ambulance Georgetown", "REACH CALSTAR Divide", "Emergency Flight"]
+                                      },
+                                      {
+                                        name: "Sutter Auburn Faith Hospital (ER)",
+                                        category: "Medical",
+                                        description: "Nearest Emergency Room - Placer/EDC.",
+                                        isVital: true,
+                                        vitalsCategory: "Medical",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "11815 Education Street, Auburn, CA 95602",
+                                          phone: "(530) 888-4500",
+                                          email: "",
+                                          website: "https://www.sutterhealth.org"
+                                        },
+                                        privateHomeZip: "95602",
+                                        serviceAreas: ["Cool", "The Divide"],
+                                        metaKeywords: ["Emergency Room Near Me", "Hospital Auburn", "ER"]
+                                      },
+                                      {
+                                        name: "Marshall Medical Center (ER - Placerville)",
+                                        category: "Medical",
+                                        description: "Nearest Emergency Room - Placer/EDC.",
+                                        isVital: true,
+                                        vitalsCategory: "Medical",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "1100 Marshall Way, Placerville, CA 95667",
+                                          phone: "(530) 622-1441",
+                                          email: "",
+                                          website: "https://www.marshallmedical.org"
+                                        },
+                                        privateHomeZip: "95667",
+                                        serviceAreas: ["Garden Valley", "Georgetown", "The Divide"],
+                                        metaKeywords: ["Emergency Room Near Me", "Hospital Placerville", "ER Marshall"]
                                       }
                                     ];
 
@@ -792,7 +894,11 @@ export const AdminPortal = () => {
                                         await addBusiness(b);
                                         added++;
                                       } else if (!exists.isVital) {
-                                        await updateBusiness(exists.id!, { isVital: true, status: 'approved', vitalsCategory: 'Fire' });
+                                        await updateBusiness(exists.id!, { 
+                                          isVital: true, 
+                                          status: 'approved', 
+                                          vitalsCategory: b.vitalsCategory 
+                                        });
                                         added++;
                                       }
                                     }
