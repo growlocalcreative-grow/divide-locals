@@ -4,16 +4,16 @@ import { initializeFirestore, CACHE_SIZE_UNLIMITED, doc, getDocFromServer, termi
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBqJtxOmfDXhuHpnbf2Y6VGp6rprodXH40",
-  authDomain: "divide-locals.firebaseapp.com",
-  projectId: "divide-locals",
-  storageBucket: "divide-locals.firebasestorage.app",
-  messagingSenderId: "1075979356521",
-  appId: "1:1075979356521:web:05c53da8eb1249b76dd5f8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
-console.log("Attempting Firestore connection to: divide-locals...");
+console.log(`Attempting Firestore connection to: ${firebaseConfig.projectId}...`);
 // Use the most aggressive compatibility settings for the preview environment
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
