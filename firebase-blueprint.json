@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "Business": {
+      "title": "Local Business",
+      "description": "A business listing in the community directory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "isVital": { "type": "boolean" },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "website": { "type": "string" },
+            "email": { "type": "string" },
+            "phone": { "type": "string" },
+            "textPhone": { "type": "string" },
+            "businessAddress": { "type": "string" }
+          }
+        },
+        "isResidentOwned": { "type": "boolean" },
+        "privateHomeZip": { "type": "string" },
+        "serviceAreas": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "approved", "draft"] },
+        "slug": { "type": "string" },
+        "heroUrl": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "logoIconName": { "type": "string" },
+        "primaryContactMethod": { "type": "string", "enum": ["text", "call", "email"] }
+      },
+      "required": ["name", "category", "ownerId"]
+    },
+    "NeighborProfile": {
+      "title": "Neighbor Profile",
+      "description": "Registered neighbor and their community involvement.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "favorites": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "isAdmin": { "type": "boolean" },
+        "residentSince": { "type": "string" },
+        "bio": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "Review": {
+      "title": "Community Review",
+      "description": "Feedback shared by a neighbor.",
+      "type": "object",
+      "properties": {
+        "businessId": { "type": "string" },
+        "neighborId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["published", "hidden", "flagged"] }
+      },
+      "required": ["businessId", "neighborId", "rating"]
+    }
+  },
+  "firestore": {
+    "businesses": {
+      "schema": "Business",
+      "description": "Community directory businesses."
+    },
+    "profiles": {
+      "schema": "NeighborProfile",
+      "description": "Neighbor profiles and admin status."
+    },
+    "reviews": {
+      "schema": "Review",
+      "description": "Neighborly feedback collections."
+    }
+  }
+}

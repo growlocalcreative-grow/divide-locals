@@ -1,0 +1,8 @@
+{
+  "name": "Divide Locals",
+  "description": "A modern, community-driven business directory for local neighborhood discovery.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}

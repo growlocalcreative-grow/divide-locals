@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny for safety
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      // User email from runtime growlocalcreative@gmail.com
+      return isEmailVerified() && request.auth.token.email == "growlocalcreative@gmail.com";
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidBusiness(data) {
+      return data.keys().hasAll(['name', 'category', 'description', 'ownerId', 'status']) &&
+             data.name is string && data.name.size() <= 200 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.description is string && data.description.size() <= 2000 &&
+             data.ownerId is string &&
+             data.status in ['pending', 'approved'] &&
+             (!('contact' in data) || (
+               data.contact is map &&
+               (!('phone' in data.contact) || data.contact.phone is string) &&
+               (!('textPhone' in data.contact) || data.contact.textPhone is string) &&
+               (!('email' in data.contact) || data.contact.email is string)
+             )) &&
+             (!('serviceAreas' in data) || (
+               data.serviceAreas is list && data.serviceAreas.size() <= 20
+             ));
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['businessId', 'neighborId', 'rating', 'comment']) &&
+             data.businessId is string &&
+             data.neighborId is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() <= 1000;
+    }
+
+    function isValidNeighborProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName']) &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() <= 100;
+    }
+
+    // --- Collection Routes ---
+
+    match /businesses/{businessId} {
+      // Public directory read
+      allow get: if true;
+      allow list: if status == 'approved';
+
+      allow create: if isEmailVerified() && 
+                    isValidBusiness(incoming()) && 
+                    incoming().ownerId == request.auth.uid &&
+                    incoming().status == 'pending' &&
+                    incoming().isResidentOwned == false;
+
+      allow update: if isEmailVerified() && (
+        isAdmin() || (
+          existing().ownerId == request.auth.uid &&
+          isValidBusiness(incoming()) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().status == existing().status && // Owners can't self-approve
+          incoming().isResidentOwned == existing().isResidentOwned && // Owners can't self-verify resident status
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'contact', 'serviceAreas', 'isVital'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isEmailVerified() && 
+                    isValidReview(incoming()) && 
+                    incoming().neighborId == request.auth.uid &&
+                    exists(/databases/$(database)/documents/businesses/$(incoming().businessId));
+
+      allow update, delete: if isAdmin() || (isEmailVerified() && existing().neighborId == request.auth.uid);
+    }
+
+    match /profiles/{profileId} {
+      allow read: if isSignedIn();
+      allow write: if isEmailVerified() && profileId == request.auth.uid;
+    }
+  }
+}
