@@ -25,14 +25,14 @@ export async function generateBusinessStory(businessData: { name: string, catego
   - Name: "${businessData.name}"
   - Category: "${businessData.category}"
   - Primary Location: "${townName}"
-  - Region: "Georgetown Divide", "Placer County", "Sierra Foothills", "The Canyon", "The Divide"
+  - Region: "Georgetown Divide", "El Dorado County", "Sierra Foothills", "The Canyon", "The Divide"
   - Fire Safe Certified: ${businessData.isFireSafeCertified ? 'YES' : 'NO'}
   
   VOICE RULES:
   1. STRICTLY 2-3 sentences only.
   2. Tone must be helpful, professional, and neighborly. 
   3. Avoid generic fluff. Focus on the value they provide to neighbors.
-  4. Use regional keywords: "${townName}", "Georgetown Divide", "Placer County", "The Divide", and "The Canyon" naturally.
+  4. Use regional keywords: "${townName}", "Georgetown Divide", "El Dorado County", "The Divide", and "The Canyon" naturally.
   5. Always mention service availability for Cool, Georgetown, Greenwood, and Garden Valley.
   6. ${isTransport ? 'CRITICAL: Explicitly highlight "Mountain Road Familiarity" and comfort navigating the unique, winding terrain of the Divide to build local trust.' : ''}
   7. ${businessData.isDivideGrown ? 'Include that they are "Divide Grown" (locally grown or harvested).' : ''}
@@ -97,7 +97,7 @@ export async function getBusinessMetadataSuggestions(businessData: { name: strin
   
   TASKS:
   1. Suggest 3-5 hyper-local Sub-Categories (e.g., Weed Eating, Brush Clearing, Livestock Care, Notary, Web Design).
-  2. Generate a comma-separated list of 8-10 SEO Meta-Keywords. Include regional terms like "The Canyon", "The Divide", "Georgetown Divide", "Placer County", "El Dorado County", and specific safety terms if applicable.
+  2. Generate a comma-separated list of 8-10 SEO Meta-Keywords. Include regional terms like "The Canyon", "The Divide", "Georgetown Divide", "El Dorado County", "Sierra Foothills", and specific safety terms if applicable.
   3. Determine if this business likely performs fire-safety related work (brush clearing, defensible space, metal/weld work, etc).
   
   RETURN JSON ONLY in this format:

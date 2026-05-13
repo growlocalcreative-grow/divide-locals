@@ -11,6 +11,7 @@ import {
   Clock,
   Settings,
   Mail,
+  Zap,
   Sprout,
   Search,
   Sparkles,
@@ -45,7 +46,7 @@ export const AdminPortal = () => {
   const { businesses } = useBusinesses();
   const { profiles } = useProfiles();
   const { reviews: allReviews } = useAllReviews();
-  const [activeTab, setActiveTab] = useState<'businesses' | 'neighbors' | 'reviews' | 'placeholders'>('businesses');
+  const [activeTab, setActiveTab] = useState<'businesses' | 'neighbors' | 'reviews' | 'placeholders' | 'vital_records'>('businesses');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'review'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
@@ -58,6 +59,7 @@ export const AdminPortal = () => {
     confirmText: string;
   } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: null });
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
@@ -69,6 +71,53 @@ export const AdminPortal = () => {
 
   const isAdmin = user?.email === ADMIN_EMAIL || profile?.isAdmin;
   const { deleteDoc: firestoreDeleteDoc } = { deleteDoc: deleteReview }; // Reuse deleteReview for name logic
+
+  const fetchAiSuggestions = React.useCallback(async (business: Business) => {
+    if (isFetchingSuggestions) return;
+    
+    setIsFetchingSuggestions(true);
+    try {
+      const suggestions = await getBusinessMetadataSuggestions({
+        name: business.name,
+        category: business.category,
+        description: business.description
+      });
+      
+      if (suggestions) {
+        setAiSuggestions(suggestions);
+        setLastFetchedId(business.id || business.name);
+        
+        // Local logic to recommend Fire Safe toggle if not already set
+        if (suggestions.recommendFireSafe && !business.isFireSafeCertified) {
+          setSelectedBusiness(prev => prev ? { ...prev, isFireSafeCertified: true } : null);
+          setShowSuccess('AI Recommendation: Fire Safe Certified Toggled ON.');
+          setTimeout(() => setShowSuccess(null), 5000);
+        }
+      }
+    } finally {
+      setIsFetchingSuggestions(false);
+    }
+  }, [isFetchingSuggestions]);
+
+  useEffect(() => {
+    if (selectedBusiness && selectedBusiness.id !== lastFetchedId && !isFetchingSuggestions) {
+      fetchAiSuggestions(selectedBusiness);
+    } else if (!selectedBusiness) {
+      setLastFetchedId(null);
+      setAiSuggestions(null);
+    }
+  }, [selectedBusiness?.id, selectedBusiness?.name, lastFetchedId, isFetchingSuggestions, fetchAiSuggestions]);
+
+  useEffect(() => {
+    if (!user || (!isAdmin && user.email !== ADMIN_EMAIL)) {
+      const timer = setTimeout(() => {
+        if (!isAdmin && user?.email !== ADMIN_EMAIL) {
+          navigate('/');
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isAdmin, navigate]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(current => {
@@ -94,8 +143,8 @@ export const AdminPortal = () => {
     });
   };
 
-  const handleExportCSV = () => {
-    const dataToExport = filteredBusinesses.map(b => ({
+  const handleExportCSV = (currentFilteredBusinesses: Business[]) => {
+    const dataToExport = currentFilteredBusinesses.map(b => ({
       'Business Name': b.name,
       'Owner Name': b.ownerName || '',
       'Email': b.contact?.email || '',
@@ -218,7 +267,7 @@ export const AdminPortal = () => {
             if (mappingConfidence === 'high') break;
           }
 
-          const existing = businesses.find(b => b.name.toLowerCase() === name.toLowerCase());
+          const existing = (businesses || []).find(b => b.name.toLowerCase() === name.toLowerCase());
           const slugify = (name: string) => name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
           
           let status = (row['status'] || row['Status'] || 'pending').toLowerCase() as any;
@@ -312,17 +361,6 @@ export const AdminPortal = () => {
     e.target.value = '';
   };
 
-  useEffect(() => {
-    if (!user || (!isAdmin && user.email !== ADMIN_EMAIL)) {
-      const timer = setTimeout(() => {
-        if (!isAdmin && user?.email !== ADMIN_EMAIL) {
-          navigate('/');
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [user, isAdmin, navigate]);
-
   if (!isAdmin && user?.email !== ADMIN_EMAIL) {
     return (
       <div className="h-screen flex items-center justify-center bg-cream">
@@ -336,7 +374,12 @@ export const AdminPortal = () => {
 
   const filteredBusinesses = getSortedBusinesses(
     businesses
-      .filter(b => filter === 'all' ? true : b.status === filter)
+      .filter(b => {
+        if (activeTab === 'businesses' && b.isVital) return false;
+        if (activeTab === 'vital_records' && !b.isVital) return false;
+        if (filter !== 'all' && b.status !== filter) return false;
+        return true;
+      })
       .filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()) || b.category.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -354,36 +397,6 @@ export const AdminPortal = () => {
     r.status?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  useEffect(() => {
-    if (selectedBusiness && selectedBusiness.id !== lastFetchedId) {
-      const fetchSuggestions = async () => {
-        setIsFetchingSuggestions(true);
-        const suggestions = await getBusinessMetadataSuggestions({
-          name: selectedBusiness.name,
-          category: selectedBusiness.category,
-          description: selectedBusiness.description
-        });
-        
-        if (suggestions) {
-          setAiSuggestions(suggestions);
-          setLastFetchedId(selectedBusiness.id || selectedBusiness.name);
-          
-          if (suggestions.recommendFireSafe && !selectedBusiness.isFireSafeCertified) {
-            setSelectedBusiness(prev => prev ? { ...prev, isFireSafeCertified: true } : null);
-            setShowSuccess('AI Recommendation: Fire Safe Certified Toggled ON.');
-            setTimeout(() => setShowSuccess(null), 5000);
-          }
-        }
-        setIsFetchingSuggestions(false);
-      };
-      
-      fetchSuggestions();
-    } else if (!selectedBusiness) {
-      setLastFetchedId(null);
-      setAiSuggestions(null);
-    }
-  }, [selectedBusiness?.id, selectedBusiness?.name]);
-
   const handleRegenerateDescription = async (business: Business) => {
     setIsRegenerating(true);
     try {
@@ -395,12 +408,102 @@ export const AdminPortal = () => {
         isFireSafeCertified: business.isFireSafeCertified
       });
       if (newStory) {
-        await updateBusiness(business.id!, { description: newStory });
-        setSelectedBusiness({ ...business, description: newStory });
+        // Ensure new story doesn't contain Placer County (backup check)
+        const scrubbedStory = newStory.replace(/Placer County/gi, 'El Dorado County');
+        await updateBusiness(business.id!, { description: scrubbedStory });
+        setSelectedBusiness({ ...business, description: scrubbedStory });
       }
     } finally {
       setIsRegenerating(false);
     }
+  };
+
+  const handleScrubVitals = async () => {
+    const fireKeywords = ['fire station', 'fire dept', 'fire protection', 'cal fire', 'garden valley fire', 'georgetown fire', 'cool fire'];
+    const candidates = businesses.filter(b => 
+      !b.isVital && (
+        fireKeywords.some(k => b.name.toLowerCase().includes(k)) ||
+        b.category.toLowerCase().includes('public safety') ||
+        b.vitalsCategory === 'Fire'
+      )
+    );
+
+    if (candidates.length === 0) {
+      setShowSuccess('No additional vital records found to scrub.');
+      setTimeout(() => setShowSuccess(null), 5000);
+      return;
+    }
+
+    setActionConfirm({
+      title: 'Scrub Public Services → Vitals',
+      message: `Found ${candidates.length} records that look like vital services (Fire/Safety). Would you like to move them to the Vitals managed collection?`,
+      confirmText: 'Sync to Vitals',
+      onConfirm: async () => {
+        setIsScrubbing(true);
+        let fixed = 0;
+        try {
+          for (const b of candidates) {
+            await updateBusiness(b.id!, { 
+              isVital: true, 
+              status: 'approved',
+              vitalsCategory: b.vitalsCategory || (b.name.toLowerCase().includes('fire') ? 'Fire' : 'Safety')
+            });
+            fixed++;
+          }
+          setShowSuccess(`Successfully promoted ${fixed} records to Vital Records.`);
+          setTimeout(() => setShowSuccess(null), 6000);
+        } finally {
+          setIsScrubbing(false);
+        }
+      }
+    });
+  };
+
+  const handleScrubCountyData = async () => {
+    const affected = businesses.filter(b => 
+      b.description?.toLowerCase().includes('placer county') || 
+      b.metaKeywords?.some(k => k.toLowerCase().includes('placer county'))
+    );
+
+    if (affected.length === 0) {
+      setShowSuccess('Perfect! No mentions of "Placer County" found in any records.');
+      setTimeout(() => setShowSuccess(null), 5000);
+      return;
+    }
+
+    setActionConfirm({
+      title: 'Scrub County Data',
+      message: `Found ${affected.length} businesses mentioning "Placer County". Would you like to automatically replace these with "El Dorado County"?`,
+      confirmText: 'Scrub & Fix All',
+      onConfirm: async () => {
+        setIsScrubbing(true);
+        let fixed = 0;
+        try {
+          for (const b of affected) {
+            const updates: Partial<Business> = {};
+            
+            if (b.description?.toLowerCase().includes('placer county')) {
+              updates.description = b.description.replace(/Placer County/gi, 'El Dorado County');
+            }
+            
+            if (b.metaKeywords?.some(k => k.toLowerCase().includes('placer county'))) {
+              updates.metaKeywords = b.metaKeywords.map(k => 
+                k.toLowerCase().includes('placer county') ? k.replace(/Placer County/gi, 'El Dorado County') : k
+              );
+            }
+
+            if (Object.keys(updates).length > 0) {
+              await updateBusiness(b.id!, updates);
+              fixed++;
+            }
+          }
+          setShowSuccess(`Successfully scrubbed ${fixed} records. All references now point to El Dorado County.`);
+          setTimeout(() => setShowSuccess(null), 6000);
+        } finally {
+          setIsScrubbing(false);
+        }
+      }
+    });
   };
 
   const handleDeleteExecution = async () => {
@@ -528,6 +631,14 @@ export const AdminPortal = () => {
             >
               System Placeholders
             </button>
+            <button
+              onClick={() => setActiveTab('vital_records')}
+              className={`px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                activeTab === 'vital_records' ? 'bg-[#2F3E5B] text-[#E7D6BF] shadow-lg' : 'bg-white text-[#2F3E5B]/40 hover:bg-[#2F3E5B]/5'
+              }`}
+            >
+              Vital Records
+            </button>
           </div>
         </div>
 
@@ -571,7 +682,7 @@ export const AdminPortal = () => {
                 />
               </div>
 
-              {activeTab === 'businesses' && (
+              {activeTab === 'businesses' || activeTab === 'vital_records' ? (
                 <div className="relative">
                   <button 
                     onClick={() => setShowDataActions(!showDataActions)}
@@ -596,6 +707,106 @@ export const AdminPortal = () => {
                           className="absolute right-0 mt-3 w-64 bg-[#E7D6BF] rounded-2xl shadow-2xl border border-[#2F3E5B]/10 overflow-hidden z-20"
                         >
                           <div className="p-2 space-y-1">
+                            {activeTab === 'vital_records' && (
+                              <>
+                                <button 
+                                  onClick={handleScrubVitals}
+                                  className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#2F3E5B] hover:bg-[#2F3E5B]/5 rounded-xl transition-all text-left"
+                                >
+                                  <ShieldCheck size={16} className="text-[#C9A24A]" />
+                                  Scrub Public Services → Vitals
+                                </button>
+                                <button 
+                                  onClick={async () => {
+                                    const seedRecords: Partial<Business>[] = [
+                                      {
+                                        name: "Garden Valley Fire (HQ)",
+                                        category: "Public Safety",
+                                        description: "Garden Valley Fire Protection District Headquarters.",
+                                        isVital: true,
+                                        vitalsCategory: "Fire",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "4860 Marshall Rd, Garden Valley, CA 95633",
+                                          phone: "(530) 333-1240",
+                                          email: "wnorman@gardenvalley.org",
+                                          website: "https://gardenvalleyfire.org"
+                                        },
+                                        privateHomeZip: "95633",
+                                        serviceAreas: ["Garden Valley", "Greenwood"]
+                                      },
+                                      {
+                                        name: "Georgetown Fire (HQ)",
+                                        category: "Public Safety",
+                                        description: "Georgetown Fire Protection District Headquarters.",
+                                        isVital: true,
+                                        vitalsCategory: "Fire",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "6283 Main St, Georgetown, CA 95634",
+                                          phone: "(530) 333-4111",
+                                          email: "info@geofire.org",
+                                          website: "https://geofire.org"
+                                        },
+                                        privateHomeZip: "95634",
+                                        serviceAreas: ["Georgetown"]
+                                      },
+                                      {
+                                        name: "Cool Fire (Station 72)",
+                                        category: "Public Safety",
+                                        description: "Garden Valley Fire Protection District - Station 72.",
+                                        isVital: true,
+                                        vitalsCategory: "Fire",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "7000 St Florian Dr, Cool, CA 95614",
+                                          phone: "(530) 889-0111",
+                                          email: "",
+                                          website: ""
+                                        },
+                                        privateHomeZip: "95614",
+                                        serviceAreas: ["Cool"]
+                                      },
+                                      {
+                                        name: "CAL FIRE Garden Valley",
+                                        category: "Public Safety",
+                                        description: "California Department of Forestry and Fire Protection - Garden Valley Station.",
+                                        isVital: true,
+                                        vitalsCategory: "Fire",
+                                        status: "approved",
+                                        contact: {
+                                          businessAddress: "4860 Marshall Rd, Garden Valley, CA 95633",
+                                          phone: "(530) 644-2345",
+                                          email: "",
+                                          website: ""
+                                        },
+                                        privateHomeZip: "95633",
+                                        serviceAreas: ["Garden Valley", "The Divide"]
+                                      }
+                                    ];
+
+                                    let added = 0;
+                                    for (const b of seedRecords) {
+                                      const exists = businesses.find(eb => eb.name === b.name);
+                                      if (!exists) {
+                                        await addBusiness(b);
+                                        added++;
+                                      } else if (!exists.isVital) {
+                                        await updateBusiness(exists.id!, { isVital: true, status: 'approved', vitalsCategory: 'Fire' });
+                                        added++;
+                                      }
+                                    }
+                                    setShowSuccess(`Synced ${added} Emergency Records to App!`);
+                                    setTimeout(() => setShowSuccess(null), 5000);
+                                    setShowDataActions(false);
+                                  }}
+                                  className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#2F3E5B] hover:bg-[#2F3E5B]/5 rounded-xl transition-all text-left"
+                                >
+                                  <Zap size={16} className="text-[#C9A24A]" />
+                                  Sync Emergency Seeds
+                                </button>
+                              </>
+                            )}
                             <button 
                               onClick={() => {
                                 handleDownloadTemplate();
@@ -608,13 +819,23 @@ export const AdminPortal = () => {
                             </button>
                             <button 
                               onClick={() => {
-                                handleExportCSV();
+                                handleExportCSV(filteredBusinesses);
                                 setShowDataActions(false);
                               }}
                               className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#2F3E5B] hover:bg-[#2F3E5B]/5 rounded-xl transition-all text-left"
                             >
                               <Download size={16} className="text-[#2F3E5B]/40" />
                               Export All Listings (CSV)
+                            </button>
+                            <button 
+                              onClick={() => {
+                                handleScrubCountyData();
+                                setShowDataActions(false);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-xl transition-all text-left"
+                            >
+                              <ShieldCheck size={16} className="text-red-400" />
+                              Scrub County Data (Placer → El Dorado)
                             </button>
                             <label className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#2F3E5B] hover:bg-[#2F3E5B]/5 rounded-xl transition-all cursor-pointer">
                               <Upload size={16} className="text-[#2F3E5B]/40" />
@@ -627,7 +848,7 @@ export const AdminPortal = () => {
                     )}
                   </AnimatePresence>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -890,6 +1111,71 @@ export const AdminPortal = () => {
               </div>
             )}
 
+            {activeTab === 'vital_records' && (
+              <div className="flex-1 overflow-auto no-scrollbar">
+                <table className="w-full border-collapse">
+                  <thead className="sticky top-0 bg-[#2F3E5B] z-10">
+                    <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A24A]">
+                      <th className="px-8 py-6 text-left font-black">Record Name</th>
+                      <th className="px-8 py-6 text-left font-black">Town</th>
+                      <th className="px-8 py-6 text-center font-black">Sync Type</th>
+                      <th className="px-8 py-6 text-left font-black">Public Contact</th>
+                      <th className="px-8 py-6 text-right font-black px-8">Authority</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#2F3E5B]/5">
+                    {filteredBusinesses.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-20 text-center">
+                          <p className="text-earth/40 font-black uppercase tracking-widest text-xs">No vital records found matching search.</p>
+                          <button 
+                            onClick={() => setShowDataActions(true)}
+                            className="mt-4 px-6 py-2 bg-[#2F3E5B] text-[#C9A24A] rounded-full text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+                          >
+                            Sync Emergency Seeds
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredBusinesses.map((b, index) => (
+                        <tr key={`vital-row-${b.id || index}`} className={`group transition-all ${index % 2 === 0 ? 'bg-[#2F3E5B]/05' : 'bg-transparent'}`}>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-[#2F3E5B] text-[#C9A24A] rounded-lg flex items-center justify-center">
+                                <ShieldCheck size={16} />
+                              </div>
+                              <span className="font-bold text-[#2F3E5B] text-xs">{b.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40">{b.privateHomeZip === '95634' ? 'Georgetown' : b.privateHomeZip === '95633' ? 'Garden Valley' : b.privateHomeZip === '95614' ? 'Cool' : 'The Divide'}</span>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <span className="px-3 py-1 bg-[#C9A24A]/10 text-[#C9A24A] rounded-full text-[8px] font-black uppercase tracking-widest border border-[#C9A24A]/20">
+                              {b.vitalsCategory || 'System'}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] font-black text-[#7A4A2E]">{b.contact?.phone}</span>
+                              <span className="text-[9px] text-[#2F3E5B]/60 font-medium truncate max-w-[150px]">{b.contact?.email || b.contact?.businessAddress}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                             <button 
+                               onClick={() => setSelectedBusiness(b)}
+                               className="w-10 h-10 bg-navy/5 text-navy rounded-xl hover:bg-navy hover:text-white transition-all flex items-center justify-center shadow-sm"
+                             >
+                               <Settings size={18} />
+                             </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {activeTab === 'placeholders' && (
               <div className="p-12 text-center">
                 <div className="max-w-md mx-auto space-y-6">
@@ -1193,6 +1479,22 @@ export const AdminPortal = () => {
                         {selectedBusiness.isVital ? 'Vital Resource' : 'Normal Service'}
                       </button>
                     </div>
+                    {selectedBusiness.isVital && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[#B2AC88]">Vitals Category</label>
+                        <select 
+                          value={selectedBusiness.vitalsCategory || 'System'}
+                          onChange={(e) => setSelectedBusiness({...selectedBusiness, vitalsCategory: e.target.value as any})}
+                          className="w-full bg-[#FDFBF7] border border-earth/10 rounded-2xl py-4 px-6 text-sm outline-none focus:ring-2 ring-[#7A4A2E] transition-all font-bold text-[#2F3E5B] appearance-none"
+                        >
+                          <option value="Fire">Fire</option>
+                          <option value="Water">Water</option>
+                          <option value="Medical">Medical</option>
+                          <option value="System">System</option>
+                          <option value="Safety">Safety</option>
+                        </select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-[#B2AC88]">Eco-Friendly</label>
                       <button 

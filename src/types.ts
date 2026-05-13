@@ -28,6 +28,7 @@ export interface Business {
   isEcoFriendly?: boolean;
   isFireSafeCertified?: boolean;
   isCommunityPartner?: boolean;
+  vitalsCategory?: 'Fire' | 'Water' | 'Medical' | 'System' | 'Safety';
   createdAt: any;
   status: 'pending' | 'approved' | 'draft' | 'review';
   slug?: string; // Kept for routing if needed

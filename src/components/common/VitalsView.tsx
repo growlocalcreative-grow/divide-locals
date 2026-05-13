@@ -41,15 +41,29 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
   const filtered = businesses.filter(b => {
     if (!category) return false;
     const cat = category.toLowerCase();
+    
+    // Prioritize explicit vitalsCategory mapping
+    if (b.vitalsCategory?.toLowerCase() === cat) return true;
+    
     const name = b.name.toLowerCase();
     const bCat = b.category.toLowerCase();
     
+    // System mapping fix
+    const isSystem = cat === 'system' && (b.vitalsCategory === 'System' || name.includes('pud') || name.includes('electric') || name.includes('utility'));
+    if (isSystem) return true;
+
     if (cat === 'fire') return name.includes('fire') || bCat.includes('fire');
     if (cat === 'water') return name.includes('water') || name.includes('pud') || bCat.includes('water');
     if (cat === 'medical') return name.includes('medical') || name.includes('health') || name.includes('hospital') || bCat.includes('health');
-    if (cat === 'system') return name.includes('pud') || name.includes('electric') || name.includes('utility');
-    if (cat === 'safety') return b.isVital || name.includes('safety') || name.includes('emergency');
+    if (cat === 'safety') return b.isVital || name.includes('safety') || name.includes('emergency') || b.vitalsCategory === 'Safety';
     return false;
+  }).sort((a, b) => {
+    // Prioritize explicit vitalsCategory matches to pin them to top
+    const aMatch = a.vitalsCategory?.toLowerCase() === category?.toLowerCase();
+    const bMatch = b.vitalsCategory?.toLowerCase() === category?.toLowerCase();
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    return 0;
   });
 
   return (
@@ -69,56 +83,74 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             className="relative w-full max-w-lg bg-[#FCF9F2] rounded-[40px] shadow-2xl overflow-hidden border border-white/20"
           >
-            <div className="p-8">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-navy/10 rounded-xl flex items-center justify-center text-navy">
-                    <ShieldCheck size={20} />
+            <div className="flex flex-col h-full">
+              {/* High-Contrast Utility Header */}
+              <div className="p-8 bg-[#2F3E5B] text-white">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#C9A24A]/20 rounded-2xl flex items-center justify-center text-[#C9A24A] border border-[#C9A24A]/30">
+                      <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-serif font-black italic tracking-tight text-[#E7D6BF]">{category} Resources</h2>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A24A]">Georgetown Divide Vitals</p>
+                    </div>
                   </div>
-                  <h2 className="text-2xl font-serif font-black text-navy">{category} Directory</h2>
+                  <button 
+                    onClick={onClose}
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 transition-all border border-white/10"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
-                <button 
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-earth/5 text-earth/40"
-                >
-                  <X size={20} />
-                </button>
               </div>
 
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar pr-2">
+              <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar scroll-smooth">
                 {loading ? (
                   <div className="py-20 flex justify-center">
-                    <div className="w-8 h-8 border-4 border-[#B2AC88]/10 border-t-[#B2AC88] rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-4 border-[#C9A24A]/10 border-t-[#C9A24A] rounded-full animate-spin" />
                   </div>
                 ) : filtered.length > 0 ? (
                   filtered.map(b => (
-                    <div key={b.id} className="p-5 bg-white rounded-3xl border border-navy/5 flex items-center justify-between group hover:shadow-md transition-all">
-                      <div>
-                        <h3 className="font-bold text-navy text-base">{b.name}</h3>
-                        <p className="text-xs text-navy/40 font-bold uppercase tracking-widest mt-1">{formatPhoneNumber(b.contact?.phone || '')}</p>
+                    <div key={b.id} className="p-6 bg-white rounded-[32px] border border-[#2F3E5B]/5 flex items-center justify-between group hover:shadow-xl hover:border-[#C9A24A]/30 transition-all">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-[#2F3E5B] text-lg leading-tight">{b.name}</h3>
+                        <div className="flex flex-col gap-1 mt-2">
+                          <p className="text-xs font-black text-[#C9A24A] flex items-center gap-2">
+                            <Phone size={10} strokeWidth={3} />
+                            {formatPhoneNumber(b.contact?.phone || '')}
+                          </p>
+                          {b.contact?.businessAddress && (
+                            <p className="text-[10px] font-bold text-[#2F3E5B]/40 uppercase tracking-wide truncate max-w-[220px]">
+                              {b.contact.businessAddress}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <a 
                         href={`tel:${getRawPhone(b.contact?.phone || '')}`}
-                        className="w-10 h-10 bg-red-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20 active:scale-90 transition-all"
+                        className="w-12 h-12 bg-[#2F3E5B] text-[#C9A24A] rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all border border-[#C9A24A]/20"
                       >
-                        <Phone size={18} strokeWidth={2.5} />
+                        <Phone size={20} strokeWidth={2.5} />
                       </a>
                     </div>
                   ))
                 ) : (
-                  <div className="py-12 px-6 border-2 border-dashed border-earth/10 rounded-[32px] text-center">
-                    <p className="text-navy/40 italic text-sm mb-4">No emergency contacts listed for {category} yet.</p>
-                    <p className="text-xs text-navy/30">Please contact the Admin Team to add your district or service.</p>
+                  <div className="py-12 px-6 border-2 border-dashed border-[#2F3E5B]/10 rounded-[40px] text-center bg-[#2F3E5B]/5">
+                    <p className="text-[#2F3E5B]/40 italic text-sm mb-4">No emergency contacts listed for {category} yet.</p>
+                    <p className="text-xs text-[#2F3E5B]/30 font-bold uppercase tracking-widest">Master Records are being updated by Admin.</p>
                   </div>
                 )}
               </div>
 
-              <button 
-                onClick={onClose}
-                className="w-full mt-8 py-4 bg-navy text-cream rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-navy/20 hover:bg-navy/90 active:scale-[0.98] transition-all"
-              >
-                Close View
-              </button>
+              <div className="p-8 pt-0">
+                <button 
+                  onClick={onClose}
+                  className="w-full py-5 bg-[#2F3E5B] text-[#E7D6BF] rounded-[24px] font-black uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all border border-[#C9A24A]/20"
+                >
+                  Exit Emergency View
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
