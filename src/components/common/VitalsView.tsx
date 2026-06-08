@@ -126,25 +126,25 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
                   </div>
                 ) : filtered.length > 0 ? (
                   filtered.map(b => (
-                    <div key={b.id} className="p-6 bg-white rounded-[32px] border border-[#2F3E5B]/5 flex items-center justify-between group hover:shadow-xl hover:border-[#C9A24A]/30 transition-all">
-                      <div className="flex-1">
+                    <div key={b.id} className="p-6 bg-white rounded-[32px] border border-[#2F3E5B]/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:shadow-xl hover:border-[#C9A24A]/30 transition-all">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-bold text-[#2F3E5B] text-lg leading-tight">{b.name}</h3>
                           {b.vitalsCategory === 'Medical' && (b.name.toLowerCase().includes('hospital') || b.name.toLowerCase().includes('medical center')) && (
-                            <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-[8px] font-black uppercase tracking-widest border border-red-100">
+                            <span className="shrink-0 px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-[8px] font-black uppercase tracking-widest border border-red-100">
                               Emergency Room
                             </span>
                           )}
                         </div>
                         
                         {(b.name.toLowerCase().includes('hospital') || b.name.toLowerCase().includes('medical center')) && (
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2 leading-relaxed">
                             Nearest Emergency Room - Placer/EDC
                           </p>
                         )}
                         
                         {(b.name.toLowerCase().includes('reach') || b.name.toLowerCase().includes('calstar')) && (
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#2F3E5B]/40 mb-2 leading-relaxed">
                             Critical Care Air Transport - El Dorado County Hub
                           </p>
                         )}
@@ -159,17 +159,17 @@ export const VitalsPopup = ({ category, onClose }: { category: string | null; on
                               href={`https://maps.apple.com/?q=${encodeURIComponent(b.contact.businessAddress)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[10px] font-bold text-[#2F3E5B]/40 uppercase tracking-wide truncate max-w-[220px] hover:text-[#C9A24A] transition-colors flex items-center gap-1"
+                              className="text-[10px] font-bold text-[#2F3E5B]/40 uppercase tracking-wide hover:text-[#C9A24A] transition-colors flex items-center gap-1"
                             >
-                              <MapPin size={8} />
-                              {b.contact.businessAddress}
+                              <MapPin size={8} className="shrink-0" />
+                              <span className="">{b.contact.businessAddress}</span>
                             </a>
                           )}
                         </div>
                       </div>
                       <a 
                         href={`tel:${getRawPhone(b.contact?.phone || '')}`}
-                        className="w-12 h-12 bg-[#2F3E5B] text-[#C9A24A] rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all border border-[#C9A24A]/20"
+                        className="w-12 h-12 shrink-0 bg-[#2F3E5B] text-[#C9A24A] rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all border border-[#C9A24A]/20 self-end sm:self-center mt-3 sm:mt-0"
                       >
                         <Phone size={20} strokeWidth={2.5} />
                       </a>

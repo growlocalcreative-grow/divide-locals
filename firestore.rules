@@ -20,6 +20,10 @@ service cloud.firestore {
       return isEmailVerified() && request.auth.token.email == "growlocalcreative@gmail.com";
     }
 
+    match /_connection_test_/{docId} {
+      allow read: if true;
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -71,7 +75,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       // Public directory read
       allow get: if true;
-      allow list: if status == 'approved';
+      allow list: if isAdmin() || status == 'approved';
 
       allow create: if isEmailVerified() && 
                     isValidBusiness(incoming()) && 

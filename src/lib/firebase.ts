@@ -20,24 +20,69 @@ export const db = initializeFirestore(app, {
   localCache: { kind: 'memory' }
 }, "(default)");
 
-export const testConnection = async () => {
-  try {
-    const { getDoc, doc } = await import('firebase/firestore');
-    const testRef = doc(db, 'businesses', 'connection_test');
-    await getDoc(testRef);
-    console.log("✅ Backend Reachable");
-  } catch (err: any) {
-    alert("Error: " + err.code);
-    console.error("❌ Connection Diagnostic Failed:", err.code, err.message);
-  }
-};
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
 
-// Auto-run connection test
-testConnection();
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+  userMessage?: string;
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo: auth?.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error Detailed: ', JSON.stringify(errInfo, null, 2));
+  
+  // Return a more user-friendly message for common errors
+  let userMessage = "Firestore Connection Failed";
+  if (errInfo.error.includes('Missing or insufficient permissions')) {
+    userMessage = `Permission Denied: Access to ${path} was rejected by security rules.`;
+  } else if (errInfo.error.includes('the client is offline')) {
+    userMessage = "Network Error: Please check your internet connection or Firebase configuration.";
+  }
+  
+  return { ...errInfo, userMessage };
+}
+
+export const auth = getAuth(app);
 
 // Helper to clear local persistence if we detect a project mismatch or on demand
 export async function clearFirebasePersistence() {
   try {
+    const { terminate, clearIndexedDbPersistence } = await import('firebase/firestore');
     await terminate(db).catch(() => {});
     await clearIndexedDbPersistence(db).catch(() => {});
     window.location.reload();
@@ -45,7 +90,28 @@ export async function clearFirebasePersistence() {
     console.error("Failed to clear persistence:", error);
   }
 }
-export const auth = getAuth(app);
+
+export const testConnection = async () => {
+  const path = '_connection_test_/status';
+  try {
+    const testRef = doc(db, '_connection_test_', 'status');
+    // Using getDocFromServer ensures we skip cache and test real connectivity
+    await getDocFromServer(testRef);
+    console.log("✅ Firestore Reachable");
+    return { success: true };
+  } catch (err: any) {
+    if (err.code === 'permission-denied') {
+      console.log("ℹ️ Firestore Reachable: Connection test successful (Permission denied as expected for public path)");
+      return { success: true };
+    }
+    const handled = handleFirestoreError(err, OperationType.GET, path);
+    console.error("❌ Firestore Connection Failed:", handled.userMessage);
+    return { success: false, error: handled.userMessage };
+  }
+};
+
+// Auto-run connection test
+testConnection();
 export const googleProvider = new GoogleAuthProvider();
 
 // Force account selection to ensure a fresh session/debug state
@@ -74,21 +140,3 @@ export const signInWithGoogle = async () => {
     throw error;
   }
 };
-
-export async function checkFirebaseConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    return { success: true };
-  } catch (error: any) {
-    alert("Error: " + error.code);
-    console.error("Firestore Connection Failed:", error);
-    return { 
-      success: false, 
-      error: error?.message || 'Unknown error',
-      isDatabaseNotFound: error?.message?.includes('Database not found')
-    };
-  }
-}
-
-// Initial check
-checkFirebaseConnection();

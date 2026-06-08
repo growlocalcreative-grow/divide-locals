@@ -17,7 +17,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
 import { Business, NeighborProfile, Review } from '../types';
 
 export function useAuth() {
@@ -65,8 +65,8 @@ export function useDirectory(category?: string) {
       setLoading(false);
       setError(null);
     }, (error: any) => {
-      console.error("Firestore Error (useDirectory):", error);
-      setError(error);
+      const handled = handleFirestoreError(error, OperationType.LIST, 'businesses (directory)');
+      setError(handled.userMessage);
       setLoading(false);
     });
 
@@ -97,8 +97,8 @@ export function useBusinesses(category?: string) {
       setLoading(false);
       setError(null);
     }, (error: any) => {
-      console.error("Firestore Error (useBusinesses):", error);
-      setError(error);
+      const handled = handleFirestoreError(error, OperationType.LIST, 'businesses (admin)');
+      setError(handled.userMessage);
       setLoading(false);
     });
 
@@ -130,9 +130,8 @@ export function useReviews(businessId?: string) {
       setLoading(false);
       setError(null);
     }, (error: any) => {
-      // Gracefully handle "failed-precondition" (index building)
-      console.error("Firestore Error (useReviews):", error);
-      setError(error);
+      const handled = handleFirestoreError(error, OperationType.LIST, `reviews (${businessId})`);
+      setError(handled.userMessage);
       setLoading(false);
     });
 
@@ -239,6 +238,9 @@ export function useAllReviews() {
       })) as Review[];
       setReviews(data);
       setLoading(false);
+    }, (error: any) => {
+      const handled = handleFirestoreError(error, OperationType.LIST, 'reviews (all)');
+      setLoading(false);
     });
     return unsubscribe;
   }, []);
@@ -267,7 +269,7 @@ export function useUserReviews(uid?: string) {
       setReviews(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Review[]);
       setLoading(false);
     }, (err) => {
-      console.error("Error fetching user reviews:", err);
+      handleFirestoreError(err, OperationType.LIST, `reviews (user: ${uid})`);
       setLoading(false);
     });
 
@@ -284,36 +286,41 @@ export async function toggleFavorite(businessId: string, userId: string, isFavor
     const favoriteSubRef = doc(db, 'profiles', userId, 'favorites', businessId);
 
     // Ensure profile exists
-    const profileSnap = await getDoc(profileRef);
-    if (!profileSnap.exists()) {
-      await setDoc(profileRef, {
-        uid: userId,
-        email: auth.currentUser?.email || '',
-        displayName: auth.currentUser?.displayName || '',
-        photoURL: auth.currentUser?.photoURL || '',
-        favorites: [],
-        isAdmin: false,
-        createdAt: serverTimestamp()
-      });
+    try {
+      const profileSnap = await getDoc(profileRef);
+      if (!profileSnap.exists()) {
+        await setDoc(profileRef, {
+          uid: userId,
+          email: auth.currentUser?.email || '',
+          displayName: auth.currentUser?.displayName || '',
+          photoURL: auth.currentUser?.photoURL || '',
+          favorites: [],
+          isAdmin: false,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `profiles/${userId}`);
+      throw err;
     }
 
     await updateDoc(businessRef, {
       favoriteCount: increment(isFavorited ? -1 : 1)
-    });
+    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `businesses/${businessId}`));
 
     if (isFavorited) {
       await updateDoc(profileRef, {
         favorites: arrayRemove(businessId)
-      });
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `profiles/${userId}`));
       try {
         await deleteDoc(favoriteSubRef);
       } catch (err) {
-        console.error("Error deleting from favorites sub-collection:", err);
+        handleFirestoreError(err, OperationType.DELETE, `profiles/${userId}/favorites/${businessId}`);
       }
     } else {
       await updateDoc(profileRef, {
         favorites: arrayUnion(businessId)
-      });
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `profiles/${userId}`));
       // Store metadata in sub-collection as requested
       await setDoc(favoriteSubRef, {
         businessId,
@@ -322,7 +329,7 @@ export async function toggleFavorite(businessId: string, userId: string, isFavor
         phone: businessData?.contact?.phone || '',
         textPhone: businessData?.contact?.textPhone || '',
         savedAt: serverTimestamp()
-      });
+      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `profiles/${userId}/favorites/${businessId}`));
     }
   } catch (err) {
     console.error("Error toggling favorite:", err);
@@ -345,7 +352,8 @@ export async function addBusiness(data: Partial<Business>) {
     };
     return await addDoc(collection(db, 'businesses'), newBusiness);
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.CREATE, 'businesses');
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -358,7 +366,8 @@ export async function addReview(data: Partial<Review>) {
       createdAt: serverTimestamp()
     });
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.CREATE, 'reviews');
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -376,7 +385,8 @@ export async function updateBusiness(id: string, data: Partial<Business>) {
       updatedAt: serverTimestamp() // We can still use updatedAt for general tracking
     });
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.UPDATE, `businesses/${id}`);
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -386,7 +396,8 @@ export async function deleteBusiness(id: string) {
     const { deleteDoc } = await import('firebase/firestore');
     return await deleteDoc(doc(db, 'businesses', id));
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.DELETE, `businesses/${id}`);
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -399,7 +410,8 @@ export async function updateReview(id: string, data: Partial<Review>) {
       updatedAt: serverTimestamp()
     });
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.UPDATE, `reviews/${id}`);
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -409,7 +421,8 @@ export async function deleteReview(id: string) {
     const { deleteDoc } = await import('firebase/firestore');
     return await deleteDoc(doc(db, 'reviews', id));
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.DELETE, `reviews/${id}`);
+    alert(handled.userMessage);
     throw err;
   }
 }
@@ -419,7 +432,8 @@ export async function updateProfile(uid: string, data: Partial<NeighborProfile>)
     const profileRef = doc(db, 'profiles', uid);
     return await updateDoc(profileRef, data);
   } catch (err: any) {
-    alert("Error: " + (err.code || err.message));
+    const handled = handleFirestoreError(err, OperationType.UPDATE, `profiles/${uid}`);
+    alert(handled.userMessage);
     throw err;
   }
 }
