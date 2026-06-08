@@ -113,7 +113,11 @@ export async function getBusinessMetadataSuggestions(businessData: { name: strin
       contents: prompt
     });
 
-    return JSON.parse(response.text.trim()) as {
+    const text = response.text.trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const cleanJson = jsonMatch ? jsonMatch[0] : text;
+
+    return JSON.parse(cleanJson) as {
       subCategories: string[];
       metaKeywords: string[];
       recommendFireSafe: boolean;
